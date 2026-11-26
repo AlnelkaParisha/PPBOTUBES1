@@ -2,31 +2,18 @@
 
 namespace App\Billing;
 
-use App\Contracts\BillingStrategy;
 use App\Models\Plan;
-use BackedEnum;
-use InvalidArgumentException;
+use Carbon\CarbonInterface;
 
-class BillingStrategyResolver
+class MonthlyBilling extends BaseBilling
 {
-    /** @var array<string, BillingStrategy> */
-    private array $strategies;
-
-    /** @param array<string, BillingStrategy> $strategies */
-    public function __construct(array $strategies)
+    public function calculateTotal(Plan $plan): int
     {
-        $this->strategies = $strategies;
+        return $this->basePrice($plan);
     }
 
-    public function resolve(Plan $plan): BillingStrategy
+    public function calculatePeriodEnd(CarbonInterface $start): CarbonInterface
     {
-        $cycle = $plan->billing_cycle;
-        $key = $cycle instanceof BackedEnum ? (string) $cycle->value : (string) $cycle;
-
-        if (!isset($this->strategies[$key])) {
-            throw new InvalidArgumentException("Siklus billing '{$key}' tidak didukung.");
-        }
-
-        return $this->strategies[$key];
+        return $start->copy()->addMonthNoOverflow();
     }
 }
