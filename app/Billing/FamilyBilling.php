@@ -2,30 +2,37 @@
 
 namespace App\Billing;
 
+use App\Contracts\SplittableBilling;
+use App\Models\Plan;
 use Carbon\CarbonInterface;
+use InvalidArgumentException;
 
-final class ProrationResult
+class FamilyBilling extends BaseBilling implements SplittableBilling
 {
-    public function __construct(
-        public readonly int $oldCredit,
-        public readonly int $newCharge,
-        public readonly CarbonInterface $newPeriodStart,
-        public readonly CarbonInterface $newPeriodEnd
-    ) {
+    public function calculateTotal(Plan $plan): int
+    {
+        return $this->basePrice($plan);
     }
 
-    public function amountDue(): int
+    public function calculatePeriodEnd(CarbonInterface $start): CarbonInterface
     {
-        return $this->newCharge - $this->oldCredit;
+        return $start->copy()->addMonthNoOverflow();
     }
 
-    public function payNow(): int
+    public function splitAmongMembers(int $total, int $membersCount): array
     {
-        return max(0, $this->amountDue());
-    }
+        if ($membersCount < 1) {
+            throw new InvalidArgumentException('Jumlah anggota minimal 1.');
+        }
 
-    public function creditBalance(): int
-    {
-        return max(0, -$this->amountDue());
+        $shares = array_fill(0, $membersCount, intdiv($total, $membersCount));
+        $remainder = $total % $membersCount;
+
+        for ($i = 0; $i < $remainder; $i++) {
+            $shares[$i]++;
+        }
+
+        return $shares;
     }
 }
+

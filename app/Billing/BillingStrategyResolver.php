@@ -2,36 +2,31 @@
 
 namespace App\Billing;
 
-use App\Contracts\SplittableBilling;
+use App\Contracts\BillingStrategy;
 use App\Models\Plan;
-use Carbon\CarbonInterface;
+use BackedEnum;
 use InvalidArgumentException;
 
-class FamilyBilling extends BaseBilling implements SplittableBilling
+class BillingStrategyResolver
 {
-    public function calculateTotal(Plan $plan): int
+    /** @var array<string, BillingStrategy> */
+    private array $strategies;
+
+    /** @param array<string, BillingStrategy> $strategies */
+    public function __construct(array $strategies)
     {
-        return $this->basePrice($plan);
+        $this->strategies = $strategies;
     }
 
-    public function calculatePeriodEnd(CarbonInterface $start): CarbonInterface
+    public function resolve(Plan $plan): BillingStrategy
     {
-        return $start->copy()->addMonthNoOverflow();
-    }
+        $cycle = $plan->billing_cycle;
+        $key = $cycle instanceof BackedEnum ? (string) $cycle->value : (string) $cycle;
 
-    public function splitAmongMembers(int $total, int $membersCount): array
-    {
-        if ($membersCount < 1) {
-            throw new InvalidArgumentException('Jumlah anggota minimal 1.');
+        if (!isset($this->strategies[$key])) {
+            throw new InvalidArgumentException("Siklus billing '{$key}' tidak didukung.");
         }
 
-        $shares = array_fill(0, $membersCount, intdiv($total, $membersCount));
-        $remainder = $total % $membersCount;
-
-        for ($i = 0; $i < $remainder; $i++) {
-            $shares[$i]++;
-        }
-
-        return $shares;
+        return $this->strategies[$key];
     }
 }
